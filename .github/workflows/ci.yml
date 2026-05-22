@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   build-and-fingerprint:
     runs-on: ubuntu-22.04
@@ -69,6 +72,7 @@ jobs:
           cp fingerprint.png fingerprints/latest.png
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
           git add fingerprints/
           git diff --staged --quiet || git commit -m "fingerprint: ${{ github.sha }}"
           git push
