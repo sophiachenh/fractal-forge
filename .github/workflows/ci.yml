@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0  # full history needed for git log order
 
       - name: Install Bazelisk
         run: |
@@ -41,6 +41,9 @@ jobs:
       - name: Generate build events
         run: bazel build //... --build_event_json_file=build_events.json || true
 
+      - name: Install Python deps
+        run: pip install Pillow --quiet
+
       - name: Evolve fractal fingerprint
         run: |
           cd python/tools
@@ -57,12 +60,6 @@ jobs:
           sudo apt-get install -y imagemagick
           convert fingerprint.ppm fingerprint.png
 
-      - name: Upload fingerprint artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-fingerprint-${{ github.sha }}
-          path: fingerprint.png
-
       - name: Commit fingerprint and state
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
@@ -72,6 +69,34 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-          git add fingerprints/
+          git add fingerprints/latest.png fingerprints/${{ github.sha }}.png fingerprints/state.json
           git diff --staged --quiet || git commit -m "fingerprint: ${{ github.sha }}"
           git push
+
+      - name: Pull latest fingerprints
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: git pull --no-edit
+
+      - name: Generate history GIF
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          python3 python/tools/make_gif.py \
+            --fingerprints-dir fingerprints \
+            --out fingerprints/history.gif \
+            --frames 10 \
+            --duration 800
+
+      - name: Commit GIF
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git add fingerprints/history.gif
+          git diff --staged --quiet || git commit -m "update history gif"
+          git push
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-fingerprint-${{ github.sha }}
+          path: |
+            fingerprint.png
+            fingerprints/history.gif
