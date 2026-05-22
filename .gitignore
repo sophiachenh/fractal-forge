@@ -1,0 +1,18 @@
+# Bazel
+bazel-*
+.bazel/
+
+# Build outputs
+*.ppm
+build_events*.json
+bench_report.md
+out.ppm
+warm.ppm
+cold.ppm
+
+# Python
+__pycache__/
+*.pyc
+
+# Rust
+rust/cli/target/
