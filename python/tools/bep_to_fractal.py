@@ -160,8 +160,6 @@ def compute_params(build: BuildMetrics, git, width=1200, height=900) -> FractalP
     # ── Boundary point selection ──────────────────────────────────────────────
     if not build.build_success:
         pt = BOUNDARY_POINTS[0]
-    elif build.cache_hit_rate < 0.2:                 # wider cold threshold
-        pt = OVERVIEW_CENTER
     else:
         lang   = git.dominant_language
         base   = LANGUAGE_BASE.get(lang, 0)
@@ -178,6 +176,11 @@ def compute_params(build: BuildMetrics, git, width=1200, height=900) -> FractalP
     t    = math.log(wall_clamped / 500.0) / math.log(30_000.0 / 500.0)
     t    = max(0.0, min(t, 1.0))
     zoom = zoom_max - t * (zoom_max - zoom_min)
+
+    # cache hit rate raises the floor so cold builds still show spiral structure
+    # 0% cache -> floor 1500, 100% cache -> floor 8000
+    zoom_floor = 1500.0 + build.cache_hit_rate * 6500.0
+    zoom = max(zoom_floor, zoom)
 
     # churn: more sensitive (divisor 500 instead of 5000)
     churn_factor = 1.0 + (git.lines_added - git.lines_deleted) / 500.0
