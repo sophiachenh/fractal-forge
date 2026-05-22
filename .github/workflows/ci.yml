@@ -73,9 +73,11 @@ jobs:
           git diff --staged --quiet || git commit -m "fingerprint: ${{ github.sha }}"
           git push
 
-      - name: Pull latest fingerprints
+      - name: Pull all fingerprints
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: git pull --no-edit
+        run: |
+          git fetch --all
+          git checkout origin/main -- fingerprints/
 
       - name: Generate history GIF
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
