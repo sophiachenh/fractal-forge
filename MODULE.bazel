@@ -1,0 +1,32 @@
+module(
+    name = "fractal_forge",
+    version = "0.1.0",
+)
+
+bazel_dep(name = "rules_cc",     version = "0.2.17")
+bazel_dep(name = "rules_rust",   version = "0.61.0")
+bazel_dep(name = "rules_python", version = "1.7.0")
+
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(edition = "2021")
+use_repo(rust, "rust_toolchains")
+register_toolchains("@rust_toolchains//:all")
+
+crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
+
+crate.from_cargo(
+    name = "crates",
+    cargo_lockfile = "//rust/cli:Cargo.lock",
+    manifests = ["//rust/cli:Cargo.toml"],
+    supported_platform_triples = [
+        "aarch64-apple-darwin",
+        "x86_64-apple-darwin",
+        "aarch64-unknown-linux-gnu",
+        "x86_64-unknown-linux-gnu",
+    ],
+)
+
+use_repo(crate, "crates")
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(python_version = "3.11")

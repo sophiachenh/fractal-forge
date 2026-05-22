@@ -1,0 +1,19 @@
+# .bazelrc — project-wide Bazel flags
+
+# ── Build settings ────────────────────────────────────────────────────────────
+build --cxxopt=-std=c++17
+build --host_cxxopt=-std=c++17
+
+# Show timing info after each build
+build --show_timestamps
+
+# ── Test settings ─────────────────────────────────────────────────────────────
+test --test_output=errors
+test --test_summary=terse
+
+# ── Remote cache (uncomment to enable) ───────────────────────────────────────
+# build --remote_cache=grpc://your-cache-server:9092
+# build --remote_upload_local_results=true
+
+# ── CI-specific settings (set CI=true in your Actions env) ───────────────────
+# build:ci --remote_cache=...

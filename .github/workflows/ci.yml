@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Bazel cache ────────────────────────────────────────────────────────
+      # This is the remote caching story: GitHub Actions cache stores Bazel
+      # artifacts between runs — incremental builds skip unchanged targets.
+      - name: Cache Bazel output base
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/bazel
+          key: bazel-${{ runner.os }}-${{ hashFiles('WORKSPACE', '**/BUILD', '**/*.bzl') }}
+          restore-keys: |
+            bazel-${{ runner.os }}-
+
+      # ── Install Bazel ──────────────────────────────────────────────────────
+      - name: Install Bazel
+        run: |
+          sudo apt-get install -y apt-transport-https curl gnupg
+          curl -fsSL https://bazel.build/bazel-release.pub.gpg \
+            | gpg --dearmor > /usr/share/keyrings/bazel.gpg
+          echo "deb [signed-by=/usr/share/keyrings/bazel.gpg] \
+            https://storage.googleapis.com/bazel-apt stable jdk1.8" \
+            | sudo tee /etc/apt/sources.list.d/bazel.list
+          sudo apt-get update && sudo apt-get install -y bazel-6.4.0
+          sudo ln -sf /usr/bin/bazel-6.4.0 /usr/bin/bazel
+
+      # ── Build all targets ──────────────────────────────────────────────────
+      - name: Build
+        run: bazel build //... --jobs=4
+
+      # ── Test all targets ───────────────────────────────────────────────────
+      - name: Test
+        run: bazel test //... --test_output=errors --jobs=4
+
+      # ── Benchmark + emit report as CI artifact ─────────────────────────────
+      - name: Benchmark
+        run: |
+          bazel run //python/tools:bench -- \
+            --cli bazel-bin/rust/cli/fractal_cli \
+            --runs 3 \
+            --out bench_report.md
+
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-report-${{ github.sha }}
+          path: bench_report.md
