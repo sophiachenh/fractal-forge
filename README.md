@@ -61,3 +61,4 @@ GitHub Actions runs on every push:
 2. `bazel build //...`
 3. `bazel test //...`
 4. Runs benchmark and uploads `bench_report.md` as a CI artifact
+ 
