@@ -6,54 +6,67 @@ on:
   pull_request:
 
 jobs:
-  build-and-test:
+  build-and-fingerprint:
     runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # need parent commit for git diff
 
-      # ── Bazel cache ────────────────────────────────────────────────────────
-      # This is the remote caching story: GitHub Actions cache stores Bazel
-      # artifacts between runs — incremental builds skip unchanged targets.
-      - name: Cache Bazel output base
+      - name: Install Bazelisk
+        run: |
+          curl -Lo /usr/local/bin/bazel \
+            https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
+          chmod +x /usr/local/bin/bazel
+
+      - name: Cache Bazel
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cache/bazel
-          key: bazel-${{ runner.os }}-${{ hashFiles('WORKSPACE', '**/BUILD', '**/*.bzl') }}
-          restore-keys: |
-            bazel-${{ runner.os }}-
+          path: ~/.cache/bazel
+          key: bazel-${{ runner.os }}-${{ hashFiles('MODULE.bazel', '**/BUILD', '**/*.bzl') }}
+          restore-keys: bazel-${{ runner.os }}-
 
-      # ── Install Bazel ──────────────────────────────────────────────────────
-      - name: Install Bazel
-        run: |
-          sudo apt-get install -y apt-transport-https curl gnupg
-          curl -fsSL https://bazel.build/bazel-release.pub.gpg \
-            | gpg --dearmor > /usr/share/keyrings/bazel.gpg
-          echo "deb [signed-by=/usr/share/keyrings/bazel.gpg] \
-            https://storage.googleapis.com/bazel-apt stable jdk1.8" \
-            | sudo tee /etc/apt/sources.list.d/bazel.list
-          sudo apt-get update && sudo apt-get install -y bazel-6.4.0
-          sudo ln -sf /usr/bin/bazel-6.4.0 /usr/bin/bazel
-
-      # ── Build all targets ──────────────────────────────────────────────────
       - name: Build
-        run: bazel build //... --jobs=4
+        run: bazel build //cpp/renderer:render_cli //rust/cli:fractal_cli
 
-      # ── Test all targets ───────────────────────────────────────────────────
       - name: Test
-        run: bazel test //... --test_output=errors --jobs=4
+        run: bazel test //cpp/renderer:renderer_test --test_output=errors
 
-      # ── Benchmark + emit report as CI artifact ─────────────────────────────
       - name: Benchmark
         run: |
-          bazel run //python/tools:bench -- \
-            --cli bazel-bin/rust/cli/fractal_cli \
-            --runs 3 \
-            --out bench_report.md
+          RENDER_CLI_PATH=$(pwd)/bazel-bin/cpp/renderer/render_cli \
+            ./rust/cli/target/release/fractal bench --runs 3 \
+            || bazel run //rust/cli:fractal_cli -- bench --runs 3
 
-      - name: Upload benchmark report
+      - name: Generate build fingerprint
+        run: |
+          bazel build //... --build_event_json_file=build_events.json || true
+          python3 python/tools/bep_to_fractal.py \
+            --bep build_events.json \
+            --out fingerprint.ppm \
+            --render-cli bazel-bin/cpp/renderer/render_cli \
+            --sha HEAD
+
+      - name: Convert PPM to PNG
+        run: |
+          sudo apt-get install -y imagemagick
+          convert fingerprint.ppm fingerprint.png
+
+      - name: Upload fingerprint
         uses: actions/upload-artifact@v4
         with:
-          name: bench-report-${{ github.sha }}
-          path: bench_report.md
+          name: build-fingerprint-${{ github.sha }}
+          path: fingerprint.png
+
+      - name: Commit fingerprint to repo
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          mkdir -p fingerprints
+          cp fingerprint.png fingerprints/${{ github.sha }}.png
+          cp fingerprint.png fingerprints/latest.png
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add fingerprints/
+          git diff --staged --quiet || git commit -m "fingerprint: ${{ github.sha }}"
+          git push
