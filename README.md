@@ -61,11 +61,3 @@ GitHub Actions runs on every push:
 2. `bazel build //...`
 3. `bazel test //...`
 4. Runs benchmark and uploads `bench_report.md` as a CI artifact
-
-## What to add next
-
-- [ ] Tile-based parallel renderer (splits canvas across threads)
-- [ ] Remote cache server (Bazel-native gRPC cache)
-- [ ] Build regression detector (parses Bazel BEP timing output)
-- [ ] Deep zoom with extended precision (beyond `double` range)
-- [ ] Web viewer that streams tiles as they render
