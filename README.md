@@ -6,10 +6,6 @@ I wanted to render fractals. Then I thought it'd be cool if each commit generate
 
 *each frame is a commit. the fractal mutates based on build + git metrics.*
 
-![latest](fingerprints/latest.png)
-
-*latest commit*
-
 ```
 cpp/renderer/   C++ does the actual math
 rust/cli/       Rust orchestrates and benchmarks
