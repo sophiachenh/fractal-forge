@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2  # need parent commit for git diff
+          fetch-depth: 2
 
       - name: Install Bazelisk
         run: |
@@ -38,33 +38,32 @@ jobs:
       - name: Test
         run: bazel test //cpp/renderer:renderer_test --test_output=errors
 
-      - name: Benchmark
-        run: |
-          RENDER_CLI_PATH=$(pwd)/bazel-bin/cpp/renderer/render_cli \
-            ./rust/cli/target/release/fractal bench --runs 3 \
-            || bazel run //rust/cli:fractal_cli -- bench --runs 3
+      - name: Generate build events
+        run: bazel build //... --build_event_json_file=build_events.json || true
 
-      - name: Generate build fingerprint
+      - name: Evolve fractal fingerprint
         run: |
-          bazel build //... --build_event_json_file=build_events.json || true
-          python3 python/tools/bep_to_fractal.py \
-            --bep build_events.json \
-            --out fingerprint.ppm \
-            --render-cli bazel-bin/cpp/renderer/render_cli \
-            --sha HEAD
+          cd python/tools
+          python3 evolve_fractal.py \
+            --bep ../../build_events.json \
+            --state ../../fingerprints/state.json \
+            --out ../../fingerprint.ppm \
+            --render-cli ../../bazel-bin/cpp/renderer/render_cli \
+            --sha ${{ github.sha }}
+          cd ../..
 
       - name: Convert PPM to PNG
         run: |
           sudo apt-get install -y imagemagick
           convert fingerprint.ppm fingerprint.png
 
-      - name: Upload fingerprint
+      - name: Upload fingerprint artifact
         uses: actions/upload-artifact@v4
         with:
           name: build-fingerprint-${{ github.sha }}
           path: fingerprint.png
 
-      - name: Commit fingerprint to repo
+      - name: Commit fingerprint and state
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
           mkdir -p fingerprints
