@@ -1,64 +1,60 @@
-# Fractal Forge
+# fractal-forge
 
-A polyglot Mandelbrot renderer built as a Bazel monorepo — the actual project is the **build system**, not the fractal.
+I wanted to render fractals. Then I thought it'd be cool if each commit generated a different one based on how the build actually went — cache hits, build time, actions compiled, which language you touched. So now every build leaves a visual fingerprint.
+
+![latest build fingerprint](fingerprints/latest.png)
+
+The faster and more cached your build, the deeper the zoom. Cold builds show the wide view. Failed builds always land on the seahorse valley edge. Touch a C++ file and the center shifts to a different boundary point than if you touched a Rust or Python file.
 
 ```
-fractal-forge/
-├── cpp/renderer/     # C++ render engine  (cc_library + cc_binary)
-├── rust/cli/         # Rust orchestrator  (rust_binary — wraps C++ via subprocess)
-├── python/
-│   ├── tools/        # Benchmark harness  (py_binary)
-│   └── tests/        # Integration tests  (py_test)
-└── .github/workflows/ci.yml
+cpp/renderer/   C++ does the actual math
+rust/cli/       Rust orchestrates and benchmarks
+python/tools/   Python parses build events and git metrics, maps them to fractal params
 ```
 
-## Why three languages?
-
-| Component | Language | Why |
-|---|---|---|
-| Pixel math core | C++ | 10M+ float ops per frame — genuinely needs native speed |
-| CLI + benchmark harness | Rust | Safe concurrency, structured JSON output, great CLI ergonomics |
-| Orchestration + tests | Python | Fast iteration, easy subprocess orchestration, rich test output |
-
-## Quickstart
+## try it
 
 ```bash
-# Build everything
+# build everything
 bazel build //...
 
-# Render a frame (outputs PPM to stdout)
-bazel run //cpp/renderer:render_cli > out.ppm
+# render a frame
+bazel run //cpp/renderer:render_cli > out.ppm && open out.ppm
 
-# Benchmark via Rust CLI
+# benchmark
 bazel run //rust/cli:fractal_cli -- bench --runs 5
 
-# Run all tests
-bazel test //...
-
-# Python benchmark report
-bazel run //python/tools:bench -- --runs 5 --out report.md
+# generate a build fingerprint from your last build
+bazel build //... --build_event_json_file=build_events.json
+python3 python/tools/bep_to_fractal.py \
+  --bep build_events.json \
+  --out fingerprint.ppm \
+  --render-cli bazel-bin/cpp/renderer/render_cli
+open fingerprint.ppm
 ```
 
-## Build architecture
+## how the fingerprint works
+
+| metric | fractal parameter |
+|---|---|
+| wall time | zoom level |
+| cache hit rate | which boundary point to zoom into |
+| actions compiled | iteration depth |
+| build success/failure | stable center vs chaotic edge |
+| dominant language touched | center region (cpp/rust/python each map to different boundary points) |
+| lines added vs deleted | zoom boost or reduction |
+| late night commit | higher iteration depth |
+| days since last commit | subtle center drift |
+
+## build architecture
 
 ```
-//cpp/renderer:renderer      ← cc_library (the math)
-        ↓ dep
-//cpp/renderer:render_cli    ← cc_binary  (PPM writer)
-        ↓ data dep
-//rust/cli:fractal_cli       ← rust_binary (orchestrator + bench harness)
-        ↓ data dep
-//python/tools:bench         ← py_binary  (Markdown report generator)
-//python/tests:pipeline_test ← py_test    (integration tests)
+//cpp/renderer:renderer      cc_library
+//cpp/renderer:render_cli    cc_binary
+//rust/cli:fractal_cli       rust_binary (runtime dep on render_cli)
+//python/tools:bep_to_fractal  py_binary
 ```
 
-Every layer depends only on the layer below — Bazel enforces this with visibility rules.
+needs [Bazelisk](https://github.com/bazelbuild/bazelisk), Bazel version pinned in `.bazelversion`
 
-## CI
-
-GitHub Actions runs on every push:
-1. Restores Bazel cache (incremental builds skip unchanged targets)
-2. `bazel build //...`
-3. `bazel test //...`
-4. Runs benchmark and uploads `bench_report.md` as a CI artifact
- 
+CI runs on every push, generates a fingerprint, and commits it to `fingerprints/`.
