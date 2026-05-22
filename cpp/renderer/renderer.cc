@@ -48,4 +48,3 @@ std::vector<Pixel> render_mandelbrot(const RenderParams& p) {
 }
 
 } // namespace fractal
-# updated
