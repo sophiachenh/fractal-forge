@@ -21,3 +21,8 @@ test --test_summary=terse
 # Remote cache
 build:remote-cache --remote_cache=http://localhost:9090
 build:remote-cache --remote_upload_local_results=true
+
+# Optimized build — measures toolchain impact on binary performance
+build:optimized --cxxopt=-O3
+build:optimized --cxxopt=-march=native
+build:optimized --cxxopt=-ffast-math
