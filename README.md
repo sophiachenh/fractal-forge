@@ -1,6 +1,6 @@
 # fractal-forge
 
-I wanted to render fractals. Then I thought it'd be cool if each commit generated a different one based on how the build actually went — cache hits, build time, actions compiled, which language you touched. So now every build leaves a visual fingerprint that evolves over time.
+I wanted to render fractals. Then I thought it'd be cool if each commit generated a different one based on how the build actually went: cache hits, build time, actions compiled, which language you touched. So now every build leaves a visual fingerprint that evolves over time.
 
 ![fractal history](fingerprints/history.gif)
 
