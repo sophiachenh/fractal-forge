@@ -17,3 +17,7 @@ test --test_summary=terse
 
 # ── CI-specific settings (set CI=true in your Actions env) ───────────────────
 # build:ci --remote_cache=...
+
+# Remote cache
+build:remote-cache --remote_cache=http://localhost:9090
+build:remote-cache --remote_upload_local_results=true
